@@ -27,32 +27,10 @@ def GetTopEloUsersInGroup(gen, tier):
     else:
         print("Error: " + str(response.status_code))
 
-
+# Get puts the top 50 players of a given group into the database
 def PutTopPlayersIntoDatabase(gen, tier):
 
     data = GetTopEloUsersInGroup(gen, tier)
-
-    #Build database entries
-    playerEntries = []
-    eloEntries = []
-
-    for entry in data:
-
-        playerEntries.append(
-            {
-                "username": entry["username"],
-                "userid": entry["userid"]
-            }
-        )
-
-        eloEntries.append(
-            {
-                "userid": entry["userid"],      #This is only used for matching elo to playerids
-                "elo": entry["elo"],
-                "gen": Generation(gen).value,
-                "tier": Tier(tier).ToString(),
-            }
-        )
 
     # Insert players and associated elo into database.
     # Not the most effecient, but sql alchemy was bugging out when I tried to do this in two queries
