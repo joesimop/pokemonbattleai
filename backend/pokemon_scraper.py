@@ -82,9 +82,9 @@ else:
 #------------------------------------------------------------#
 
 # Insert the scraped data into the database
-with db.engine.begin() as conn:
-    conn.execute(
-        sqlalchemy
-        .insert(pokemon)
-        .values(pokedex)
-    )
+# with db.engine.begin() as conn:
+#     conn.execute(
+#         sqlalchemy
+#         .insert(pokemon)
+#         .values(pokedex)
+#     )
