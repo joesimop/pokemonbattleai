@@ -1,12 +1,20 @@
 import tkinter
 from tkinter import ttk
+import time
+
+from selenium import webdriver
+
+from .driver import WebDriver
 
 
 class GUI:
     
     window: tkinter.Tk
-    _team_info_frame: ttk.Frame
-    _team_info_subframes: list[ttk.Frame]
+    driver: WebDriver | None
+    _near_team_info_frame: ttk.Frame
+    _near_team_info_subframes: list[ttk.Frame]
+    _far_team_info_frame: ttk.Frame
+    _far_team_info_subframes: list[ttk.Frame]
     _move_info_frame: ttk.Frame
     _move_info_subframes: list[ttk.Frame]
     
@@ -18,30 +26,58 @@ class GUI:
         self.window.geometry(geometry)
         
         self._add_buttons()
-        self._team_info_frame, self._team_info_subframes = self._add_team_info()
+        self._near_team_info_frame, self._near_team_info_subframes = self._add_team_info('Your Team')
+        self._far_team_info_frame, self._far_team_info_subframes = self._add_team_info('Enemy Team')
         self._move_info_frame, self._move_info_subframes = self._add_move_info()
-        
-        self.window.mainloop()
     
     def run(self) -> None:
         """Run the GUI."""
         self.window.mainloop()
     
+    def hook(self, driver: WebDriver) -> None:
+        """Hook the GUI to the driver."""
+        self.driver = driver
+    
+    def _update_team_info_from_driver(self) -> None:
+        """Update the info frame from the driver."""
+        if self.driver is None:
+            return
+        # slight delay to wait for mouse movement to stop
+        time.sleep(0.5)
+        
+        near_team_info = self.driver.get_my_team_info()
+        near_team_info_strings = [info.display().split('\n') for info in near_team_info]
+        self.update_info_frame(self._near_team_info_frame, self._near_team_info_subframes, near_team_info_strings)
+        
+        far_team_info = self.driver.get_enemy_team_info()
+        far_team_info_strings = [info.display().split('\n') for info in far_team_info]
+        self.update_info_frame(self._far_team_info_frame, self._far_team_info_subframes, far_team_info_strings)
+    
+    def _update_move_info_from_driver(self) -> None:
+        """Update the info frame from the driver."""
+        if self.driver is None:
+            return
+        # slight delay to wait for mouse movement to stop
+        time.sleep(0.5)
+        move_info = self.driver.get_available_moves()
+        move_info_strings = [info.display().split('\n') for info in move_info]
+        self.update_info_frame(self._move_info_frame, self._move_info_subframes, move_info_strings)
+    
     def _add_buttons(self) -> None:
         """Add buttons to the window."""
         button_frame = ttk.Frame(self.window)
         button_frame.pack(side=tkinter.BOTTOM, pady=10)
-        btn = ttk.Button(button_frame, text='Get Move Info', command=lambda: print('Call to driver for move info'))
+        btn = ttk.Button(button_frame, text='Get Team Info', command=self._update_team_info_from_driver)
         btn.pack(side=tkinter.LEFT, padx=5, pady=5)
-        btn = ttk.Button(button_frame, text='Get Team Info', command=lambda: print('Call to driver for team info'))
+        btn = ttk.Button(button_frame, text='Get Move Info', command=self._update_move_info_from_driver)
         btn.pack(side=tkinter.LEFT, padx=5, pady=5)
     
-    def _add_team_info(self) -> tuple[ttk.Frame, list[ttk.Frame]]:
+    def _add_team_info(self, team_name: str) -> tuple[ttk.Frame, list[ttk.Frame]]:
         """Adds an area to display team info in a horizontal frame."""
         team_frame = ttk.Frame(self.window)
         team_frame.pack(side=tkinter.TOP, pady=10)
         
-        team_label = ttk.Label(team_frame, text='Team Info')
+        team_label = ttk.Label(team_frame, text=f'Team Info: {team_name}')
         team_label.pack(side=tkinter.TOP)
         
         team_info_frame = ttk.Frame(team_frame)
@@ -78,37 +114,16 @@ class GUI:
         
         return move_info_frame, subframes
     
-    def update_info_frame(self, info: list[list[str]]) -> None:
+    def update_info_frame(self, frame: ttk.Frame, subframes: list[ttk.Frame], info: list[list[str]]) -> None:
         """Update the info frame with the given info."""
-        for subframe in self._team_info_subframes:
+        for subframe in subframes:
             subframe.destroy()
-        self._team_info_subframes.clear()
+        subframes.clear()
         for info_lines in info:
-            subframe = ttk.Frame(self._team_info_frame)
+            subframe = ttk.Frame(frame)
             subframe.pack(side=tkinter.LEFT, padx=5)
             for line in info_lines:
                 label = ttk.Label(subframe, text=line)
                 label.pack(side=tkinter.TOP)
-            self._team_info_subframes.append(subframe)
-        self._team_info_frame.update()
-    
-    def test_info_update(self) -> None:
-        """Test updating the info frame."""
-        info = [
-            ['Test 1', 'Test 2'],
-            ['Test 3', 'Test 4'],
-            ['Test 5', 'Test 6'],
-            ['Test 7', 'Test 8'],
-            ['Test 9', 'Test 10'],
-            ['Test 11', 'Test 12'],
-        ]
-        self.update_info_frame(info)
-
-
-def main() -> None:
-    gui = GUI('Pokemon Showdown Bot', '500x500')
-    gui.test_info_update()
-    gui.run()
-
-if __name__ == '__main__':
-    main()
+            subframes.append(subframe)
+        frame.update()
