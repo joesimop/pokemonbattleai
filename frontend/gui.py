@@ -2,9 +2,7 @@ import tkinter
 from tkinter import ttk
 import time
 
-from selenium import webdriver
-
-from .driver import WebDriver
+from .driver import WebDriver, PokemonInfo, MoveInfo, StatbarInfo, StartingPokemonInfo
 
 
 class GUI:
@@ -17,6 +15,9 @@ class GUI:
     _far_team_info_subframes: list[ttk.Frame]
     _move_info_frame: ttk.Frame
     _move_info_subframes: list[ttk.Frame]
+    my_team: list[StartingPokemonInfo]
+    enemy_team: list[PokemonInfo]
+    moves: list[MoveInfo]
     
     """A GUI for the bot."""
     def __init__(self, window_name: str, geometry: str) -> None:
@@ -38,20 +39,31 @@ class GUI:
         """Hook the GUI to the driver."""
         self.driver = driver
     
-    def _update_team_info_from_driver(self) -> None:
-        """Update the info frame from the driver."""
+    def _update_starting_team_info_from_driver(self) -> None:
+        """Update the starting team info frame from the driver."""
         if self.driver is None:
             return
         # slight delay to wait for mouse movement to stop
         time.sleep(0.5)
         
-        near_team_info = self.driver.get_my_team_info()
-        near_team_info_strings = [info.display().split('\n') for info in near_team_info]
-        self.update_info_frame(self._near_team_info_frame, self._near_team_info_subframes, near_team_info_strings)
+        starting_team_info = self.driver.get_starting_info()
+        starting_team_info_strings = [info.display().split('\n') for info in starting_team_info]
+        self.update_info_frame(self._near_team_info_frame, self._near_team_info_subframes, starting_team_info_strings)
+        
+        self.my_team = starting_team_info
+    
+    def _update_enemy_team_info_from_driver(self) -> None:
+        """Update the enemy team info frame from the driver."""
+        if self.driver is None:
+            return
+        # slight delay to wait for mouse movement to stop
+        time.sleep(0.5)
         
         far_team_info = self.driver.get_enemy_team_info()
         far_team_info_strings = [info.display().split('\n') for info in far_team_info]
         self.update_info_frame(self._far_team_info_frame, self._far_team_info_subframes, far_team_info_strings)
+        
+        self.enemy_team = far_team_info
     
     def _update_move_info_from_driver(self) -> None:
         """Update the info frame from the driver."""
@@ -62,12 +74,16 @@ class GUI:
         move_info = self.driver.get_available_moves()
         move_info_strings = [info.display().split('\n') for info in move_info]
         self.update_info_frame(self._move_info_frame, self._move_info_subframes, move_info_strings)
+        
+        self.moves = move_info
     
     def _add_buttons(self) -> None:
         """Add buttons to the window."""
         button_frame = ttk.Frame(self.window)
         button_frame.pack(side=tkinter.BOTTOM, pady=10)
-        btn = ttk.Button(button_frame, text='Get Team Info', command=self._update_team_info_from_driver)
+        btn = ttk.Button(button_frame, text='Get Starting Info', command=self._update_starting_team_info_from_driver)
+        btn.pack(side=tkinter.LEFT, padx=5, pady=5)
+        btn = ttk.Button(button_frame, text='Get Enemy Team Info', command=self._update_enemy_team_info_from_driver)
         btn.pack(side=tkinter.LEFT, padx=5, pady=5)
         btn = ttk.Button(button_frame, text='Get Move Info', command=self._update_move_info_from_driver)
         btn.pack(side=tkinter.LEFT, padx=5, pady=5)
