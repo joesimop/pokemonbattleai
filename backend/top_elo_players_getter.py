@@ -1,6 +1,4 @@
 import requests
-from bs4 import BeautifulSoup
-from sys import maxsize as MAX_INT
 import json
 
 from enum import Enum
@@ -10,7 +8,6 @@ from replay_utils import *
 import database as db
 import sqlalchemy
 from schemas import players, elo_rankings
-from databasesync import pkTypes, pkMoveCategories
 
 #Returns the top 50 users in a given group
 def GetTopEloUsersInGroup(gen, tier):

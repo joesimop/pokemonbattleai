@@ -5,19 +5,19 @@ replayBaseUrl = "https://replay.pokemonshowdown.com/"
 ladderUrl = baseUrl + "ladder/"
 
 class Tier(Enum):
-    OU = 1
-    UU = 2
-    RU = 3
-    NU = 4
-    PU = 5
-    ZU = 6
-    NFE = 7
-    LC = 8
-    CAP = 9
-    Ubers = 11
-    AnythingGoes = 12
-    OneVOne = 13
-    Monotype = 14
+    OU = 'ou'
+    UU = 'uu'
+    RU = 'ru'
+    NU = 'nu'
+    PU = 'pu'
+    ZU = 'zu'
+    NFE = 'nfe'
+    LC = 'lc'
+    CAP = 'cap'
+    Ubers = 'ubers'
+    AnythingGoes = 'anythinggoes'
+    OneVOne = '1v1'
+    Monotype = 'monotype'
 
     def ToString(self):
 

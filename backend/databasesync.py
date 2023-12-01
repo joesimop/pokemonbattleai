@@ -1,12 +1,13 @@
 import database as db
 import sqlalchemy
 
-from schemas import types, move_categories
+from schemas import types, move_categories, players
 
 #------------------------------------------------------------#
 # Accessible variables
 pkTypes = None
 pkMoveCategories = None
+pkPlayers = None
 #------------------------------------------------------------#
 
 def SyncTypes():
@@ -44,7 +45,24 @@ def SyncMoveCategories():
 
     return pkMoveCategories
 
+def SyncPlayers():
+
+    # Create a dictionary to store the primary keys with each type
+    pkPlayers = {}
+
+    with db.engine.begin() as conn:
+
+        result = conn.execute(
+            sqlalchemy
+            .select(players.c.id, players.c.username)
+        )
+
+        pkPlayers = {row[1].lower(): row[0] for row in result}
+
+    return pkPlayers
+
 
 
 pkTypes = SyncTypes()
 pkMoveCategories = SyncMoveCategories()
+pkPlayers = SyncPlayers()
