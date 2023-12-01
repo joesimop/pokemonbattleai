@@ -9,14 +9,18 @@ from selenium.common.exceptions import NoSuchElementException
 
 
 @dataclass
-class StatbarInfo:
-    name: str
-    level: int
-    hp_percent: int
+class ModifierInfo:
+    atk: float
+    def_: float
+    spa: float
+    spd: float
+    spe: float
+    evasion: float
+    accuracy: float
     
     def display(self) -> str:
         """Return a string representation of the statbar."""
-        return f'{self.name} (Lv. {self.level}) {self.hp_percent}% HP'
+        return f'{self.atk}/{self.def_}/{self.spa}/{self.spd}/{self.spe}\n{self.evasion} Evasion\n{self.accuracy} Accuracy'
 
 @dataclass
 class MoveInfo:
@@ -67,18 +71,47 @@ class StartingPokemonInfo:
             f'HP: {self.total_hp} ({self.hp_percent}%)',
             f'Ability: {self.ability}',
             f'Item: {self.item}',
-            f'Atk {self.atk} / Def {self.def_} / SpA {self.spa} / SpD {self.spd} / Spe {self.spe}',
+            f'{self.atk}/{self.def_}/{self.spa}/{self.spd}/{self.spe}',
             f'Moves:\n{moves_str}'
         ]
         return '\n'.join(lines)
     
-def _parse_statbar(statbar: str) -> StatbarInfo:
+def _parse_statbar(statbar: WebElement) -> ModifierInfo:
     """Parse a statbar string into a StatbarInfo object."""
-    statbar_info = statbar.split()
-    name = ' '.join(statbar_info[:-2])
-    level = statbar_info[-2]
-    hp_percent = int(statbar_info[-1])
-    return StatbarInfo(name, level, hp_percent)
+    statuses = statbar.find_element(by=By.CLASS_NAME, value='status')
+    temp_modifiers = {
+        'Atk': 1.0,
+        'Def': 1.0,
+        'SpA': 1.0,
+        'SpD': 1.0,
+        'Spe': 1.0,
+        'Evasion': 1.0,
+        'Accuracy': 1.0,
+    }
+    after_buff: tuple[str, float] | None = None
+    for modifier in [e.text for e in statuses.find_elements(by=By.TAG_NAME, value='span')]:
+        if 'Protosynthesis' in modifier or 'Quark Drive' in modifier:
+            affected = modifier.split(':')[1].strip()
+            if affected == 'Spe':
+                after_buff = (affected, 0.5)
+            else:
+                after_buff = (affected, 0.3)
+        else:
+            modifier_name = modifier.split()[0][:-1]
+            modifier_value = float(modifier.split()[1].strip())
+            temp_modifiers[modifier_name] = modifier_value
+    
+    temp_modifiers[after_buff[0]] += after_buff[1]
+    
+    return ModifierInfo(
+        atk=temp_modifiers['Atk'],
+        def_=temp_modifiers['Def'],
+        spa=temp_modifiers['SpA'],
+        spd=temp_modifiers['SpD'],
+        spe=temp_modifiers['Spe'],
+        evasion=temp_modifiers['Evasion'],
+        accuracy=temp_modifiers['Accuracy'],
+    )
 
 
 class WebDriver(webdriver.Chrome):
@@ -86,13 +119,13 @@ class WebDriver(webdriver.Chrome):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-    def get_enemy_statbar(self) -> StatbarInfo:
+    def get_enemy_statbar(self) -> ModifierInfo:
         enemy_statbar = self.find_elements(by=By.CLASS_NAME, value='statbar')[0]
-        return _parse_statbar(enemy_statbar.text)
+        return _parse_statbar(enemy_statbar)
 
-    def get_my_statbar(self) -> StatbarInfo:
+    def get_my_statbar(self) -> ModifierInfo:
         my_statbar = self.find_elements(by=By.CLASS_NAME, value='statbar')[1]
-        return _parse_statbar(my_statbar.text)
+        return _parse_statbar(my_statbar)
 
     def get_available_moves(self) -> list[MoveInfo]:
         """Return a list of available moves."""
@@ -140,7 +173,10 @@ class WebDriver(webdriver.Chrome):
                 pokemon_name = header.text
                 pokemon_gender = self._get_gender_from_header(header)
                 pokemon_info = tooltip.find_elements(by=By.TAG_NAME, value='p')
-                pokemon_hp = float(pokemon_info[0].text.split(':')[1].split('%')[0])
+                try:
+                    pokemon_hp = float(pokemon_info[0].text.split(':')[1].split('%')[0])
+                except ValueError:
+                    pokemon_hp = 0.0
                 pokemon_abilities = [a.strip() for a in pokemon_info[1].text.split(':')[1].split(',')]
                 line_3_raw = pokemon_info[2].text.split()
                 if line_3_raw[0] == 'Spe':
@@ -168,6 +204,10 @@ class WebDriver(webdriver.Chrome):
             header = tooltip.find_element(by=By.TAG_NAME, value='h2')
             pokemon_types = self._get_types_from_header(header)
             pokemon_info = tooltip.find_elements(by=By.TAG_NAME, value='p')
+            try:
+                pokemon_item = pokemon_info[1].text.split(':')[2].strip()
+            except IndexError:
+                pokemon_item = 'None'
             starting_info.append(StartingPokemonInfo(
                 name=self._get_pokemon_type(header.text.split('\n')[0]),
                 gender=self._get_gender_from_header(header),
@@ -176,7 +216,7 @@ class WebDriver(webdriver.Chrome):
                 hp_percent=float(pokemon_info[0].text.split(':')[1].split('%')[0]),
                 total_hp=int(pokemon_info[0].text.split('/')[1].split(')')[0]),
                 ability=pokemon_info[1].text.split(':')[1].split('/')[0].strip(),
-                item=pokemon_info[1].text.split(':')[2].strip(),
+                item=pokemon_item,
                 atk=int(pokemon_info[2].text.split('/')[0].strip().split()[1]),
                 def_=int(pokemon_info[2].text.split('/')[1].strip().split()[1]),
                 spa=int(pokemon_info[2].text.split('/')[2].strip().split()[1]),
