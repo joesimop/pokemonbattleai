@@ -6,6 +6,7 @@ from schemas import types, move_categories, players
 #------------------------------------------------------------#
 # Accessible variables
 pkTypes = None
+Typespk = None
 pkMoveCategories = None
 pkPlayers = None
 #------------------------------------------------------------#
@@ -23,10 +24,14 @@ def SyncTypes():
         )
 
         pkTypes = {row[1]: row[0] for row in result}
+        Typespk = dict((v,k) for k,v in pkTypes.items())
 
     pkTypes[""] = 20
+    Typespk[20] = None
 
-    return pkTypes
+
+
+    return (pkTypes, Typespk)
 
 def SyncMoveCategories():
 
@@ -63,6 +68,6 @@ def SyncPlayers():
 
 
 
-pkTypes = SyncTypes()
+(pkTypes, Typespk) = SyncTypes()
 pkMoveCategories = SyncMoveCategories()
 pkPlayers = SyncPlayers()
