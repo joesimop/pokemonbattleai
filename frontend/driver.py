@@ -11,13 +11,14 @@ from selenium.common.exceptions import NoSuchElementException
 
 @dataclass
 class ModifierInfo:
-    atk: float
-    def_: float
-    spa: float
-    spd: float
-    spe: float
-    evasion: float
-    accuracy: float
+    pokemon: str
+    atk: int
+    def_: int
+    spa: int
+    spd: int
+    spe: int
+    evasion: int
+    accuracy: int
     confused: bool
     paralyzed: bool
     aqua_ring: bool
@@ -28,7 +29,8 @@ class ModifierInfo:
     
     def display(self) -> str:
         """Return a string representation of the statbar."""
-        final_string = f'{self.atk}/{self.def_}/{self.spa}/{self.spd}/{self.spe}\n{self.evasion} Evasion\n{self.accuracy} Accuracy'
+        final_string = f'{self.pokemon}:\n'
+        final_string += f'{self.atk}/{self.def_}/{self.spa}/{self.spd}/{self.spe}\n{self.evasion} Evasion\n{self.accuracy} Accuracy'
         if self.confused:
             final_string += '\nConfused'
         if self.paralyzed:
@@ -58,6 +60,7 @@ class MoveInfo:
 @dataclass
 class PokemonInfo:
     name: str
+    nickname: str | None
     gender: str | None
     hp_percent: float
     item: str | None
@@ -72,6 +75,7 @@ class PokemonInfo:
 @dataclass
 class StartingPokemonInfo:
     name: str
+    nickname: str | None
     types: list[str]
     tera_type: str
     gender: str | None
@@ -119,6 +123,43 @@ class BattlefieldInfo:
         final_strings.append('Enemy Hazards:\n' + '\n'.join(f'- {effect}' for effect in self.enemy_hazards))
         return final_strings
 
+def _convert_stat_to_stage(raw: float, acc_eva: bool) -> int:
+    """Convert a raw stat to a multiplier stage."""
+    if acc_eva:
+        conversions = [
+            (9 / 3, 6),
+            (8 / 3, 5),
+            (7 / 3, 4),
+            (6 / 3, 3),
+            (5 / 3, 2),
+            (4 / 3, 1),
+            (3 / 3, 0),
+            (3 / 4, -1),
+            (3 / 5, -2),
+            (3 / 6, -3),
+            (3 / 7, -4),
+            (3 / 8, -5),
+            (3 / 9, -6),
+        ]
+    else:
+        conversions = [
+            (8 / 2, 6),
+            (7 / 2, 5),
+            (6 / 2, 4),
+            (5 / 2, 3),
+            (4 / 2, 2),
+            (3 / 2, 1),
+            (2 / 2, 0),
+            (2 / 3, -1),
+            (2 / 4, -2),
+            (2 / 5, -3),
+            (2 / 6, -4),
+            (2 / 7, -5),
+            (2 / 8, -6),
+        ]
+    
+    return min(conversions, key=lambda x: abs(raw - x[0]))[1]
+
 def _parse_statbar(statbar: WebElement) -> ModifierInfo:
     """Parse a statbar string into a StatbarInfo object."""
     statuses = statbar.find_element(by=By.CLASS_NAME, value='status')
@@ -139,14 +180,9 @@ def _parse_statbar(statbar: WebElement) -> ModifierInfo:
     toxic = False
     endure = False
 
-    after_buff: tuple[str, float] | None = None
     for modifier in [e.text for e in statuses.find_elements(by=By.TAG_NAME, value='span')]:
         if 'Protosynthesis' in modifier or 'Quark Drive' in modifier:
-            affected = modifier.split(':')[1].strip()
-            if affected == 'Spe':
-                after_buff = (affected, 0.5)
-            else:
-                after_buff = (affected, 0.3)
+            pass
         elif 'Confused' in modifier:
             confused = True
         elif 'PAR' in modifier:
@@ -166,17 +202,15 @@ def _parse_statbar(statbar: WebElement) -> ModifierInfo:
             modifier_value = float(modifier.split()[1].strip())
             temp_modifiers[modifier_name] = modifier_value
     
-    if after_buff is not None:
-        temp_modifiers[after_buff[0]] += after_buff[1]
-    
     return ModifierInfo(
-        atk=temp_modifiers['Atk'],
-        def_=temp_modifiers['Def'],
-        spa=temp_modifiers['SpA'],
-        spd=temp_modifiers['SpD'],
-        spe=temp_modifiers['Spe'],
-        evasion=temp_modifiers['Evasion'],
-        accuracy=temp_modifiers['Accuracy'],
+        pokemon=statbar.text.split('\n')[0].strip(),
+        atk=_convert_stat_to_stage(temp_modifiers['Atk'], False),
+        def_=_convert_stat_to_stage(temp_modifiers['Def'], False),
+        spa=_convert_stat_to_stage(temp_modifiers['SpA'], False),
+        spd=_convert_stat_to_stage(temp_modifiers['SpD'], False),
+        spe=_convert_stat_to_stage(temp_modifiers['Spe'], False),
+        evasion=_convert_stat_to_stage(temp_modifiers['Evasion'], True),
+        accuracy=_convert_stat_to_stage(temp_modifiers['Accuracy'], True),
         confused=confused,
         paralyzed=paralyzed,
         aqua_ring=aqua_ring,
@@ -193,11 +227,11 @@ class WebDriver(webdriver.Chrome):
         super().__init__(*args, **kwargs)
 
     def get_enemy_statbar(self) -> ModifierInfo:
-        enemy_statbar = self.find_elements(by=By.CLASS_NAME, value='statbar')[0]
+        enemy_statbar = self.find_element(by=By.CLASS_NAME, value='lstatbar')
         return _parse_statbar(enemy_statbar)
 
     def get_my_statbar(self) -> ModifierInfo:
-        my_statbar = self.find_elements(by=By.CLASS_NAME, value='statbar')[1]
+        my_statbar = self.find_element(by=By.CLASS_NAME, value='rstatbar')
         return _parse_statbar(my_statbar)
 
     def get_available_moves(self) -> list[MoveInfo]:
@@ -233,10 +267,13 @@ class WebDriver(webdriver.Chrome):
             types.extend([img.get_attribute('alt') for img in container.find_elements(by=By.TAG_NAME, value='img')])
         return types
     
-    def _get_pokemon_type(self, pokemon_name: str) -> str:
-        if '(' in pokemon_name:
-            return pokemon_name.split('(')[1].split(')')[0]
-        return pokemon_name.strip()
+    def _get_pokemon_type(self, pokemon_header: str) -> tuple[str, str | None]:
+        pokemon_type = pokemon_header.strip()
+        nickname = None
+        if '(' in pokemon_header:
+            pokemon_type = pokemon_header.split('(')[1].split(')')[0]
+            nickname = pokemon_header.split('(')[0].strip()
+        return (pokemon_type, nickname)
 
     def _get_team_info(self, side_name: str) -> list[PokemonInfo]:
         side = self.find_element(by=By.CLASS_NAME, value=side_name)
@@ -248,7 +285,7 @@ class WebDriver(webdriver.Chrome):
                 if tooltip is None:
                     continue
                 header = tooltip.find_element(by=By.TAG_NAME, value='h2')
-                pokemon_name = header.text
+                pokemon_name, pokemon_nickname = self._get_pokemon_type(header.text)
                 pokemon_gender = self._get_gender_from_header(header)
                 pokemon_info = tooltip.find_elements(by=By.TAG_NAME, value='p')
                 try:
@@ -267,7 +304,7 @@ class WebDriver(webdriver.Chrome):
                     line_4_raw = pokemon_info[3].text.split()
                     pokemon_speed = (int(line_4_raw[1]), int(line_4_raw[1]))
                 
-                team.append(PokemonInfo(pokemon_name, pokemon_gender, pokemon_hp, item, pokemon_abilities, pokemon_speed))
+                team.append(PokemonInfo(pokemon_name, pokemon_nickname, pokemon_gender, pokemon_hp, item, pokemon_abilities, pokemon_speed))
         
         return team
 
@@ -304,8 +341,10 @@ class WebDriver(webdriver.Chrome):
                 total_hp = int(pokemon_info[0].text.split('/')[1].split(')')[0])
             except ValueError:
                 fainted = True
+            name, nickname = self._get_pokemon_type(header.text.split('\n')[0])
             starting_info.append(StartingPokemonInfo(
-                name=self._get_pokemon_type(header.text.split('\n')[0]),
+                name=name,
+                nickname=nickname,
                 gender=self._get_gender_from_header(header),
                 types=pokemon_types[:-1],
                 tera_type=pokemon_types[-1],
@@ -346,12 +385,13 @@ class WebDriver(webdriver.Chrome):
             elif effect_name in {'Light Screen', 'Reflect', 'Mist', 'Aurora Veil', 'Safeguard'}:
                 info.my_other.append(effect_name)
             elif effect_name in {'Foe\'s Light Screen', 'Foe\'s Reflect', 'Foe\'s Mist', 'Foe\'s Aurora Veil', 'Foe\'s Safeguard'}:
-                info.enemy_other.append(effect_name)
+                info.enemy_other.append(' '.join(effect_name.split(' ')[1:]))
             else:
                 print(f'Unknown effect: {effect_name}')
         
         inner_battle_div = self.find_element(by=By.CLASS_NAME, value='innerbattle')
-        graphics_div = inner_battle_div.find_elements(by=By.TAG_NAME, value='div')[4]
+        children = inner_battle_div.find_elements(by=By.XPATH, value='./*')
+        graphics_div = children[4]
         my_hazards = graphics_div.find_elements(by=By.TAG_NAME, value='div')[2].find_elements(by=By.TAG_NAME, value='img')
         enemy_hazards = graphics_div.find_elements(by=By.TAG_NAME, value='div')[1].find_elements(by=By.TAG_NAME, value='img')
         
@@ -372,7 +412,8 @@ class WebDriver(webdriver.Chrome):
         for hazard in enemy_hazards:
             hazard_name = hazard.get_attribute('src').split('/')[-1].split('.')[0]
             if hazard_name in {'rock1', 'rock2'}:
-                info.enemy_hazards.append('Stealth Rock')
+                if 'Stealth Rock' not in info.enemy_hazards:
+                    info.enemy_hazards.append('Stealth Rock')
             elif hazard_name == 'caltrop':
                 info.enemy_hazards.append('Spikes')
             elif hazard_name == 'poisoncaltrop':
