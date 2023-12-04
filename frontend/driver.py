@@ -26,6 +26,7 @@ class ModifierInfo:
     frozen: bool
     toxic: bool
     endure: bool
+    poison: bool
     
     def display(self) -> str:
         """Return a string representation of the statbar."""
@@ -179,6 +180,7 @@ def _parse_statbar(statbar: WebElement) -> ModifierInfo:
     frozen = False
     toxic = False
     endure = False
+    poison = False
 
     for modifier in [e.text for e in statuses.find_elements(by=By.TAG_NAME, value='span')]:
         if 'Protosynthesis' in modifier or 'Quark Drive' in modifier:
@@ -197,9 +199,11 @@ def _parse_statbar(statbar: WebElement) -> ModifierInfo:
             toxic = True
         elif 'Endure' in modifier:
             endure = True
+        elif 'PZN' in modifier:
+            poison = True
         else:
-            modifier_name = modifier.split()[0][:-1]
-            modifier_value = float(modifier.split()[1].strip())
+            modifier_name = modifier.split()[1].strip()
+            modifier_value = float(modifier.split()[0][:-1])
             temp_modifiers[modifier_name] = modifier_value
     
     return ModifierInfo(
@@ -218,6 +222,7 @@ def _parse_statbar(statbar: WebElement) -> ModifierInfo:
         frozen=frozen,
         toxic=toxic,
         endure=endure,
+        poison=poison,
     )
 
 

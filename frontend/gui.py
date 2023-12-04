@@ -323,12 +323,16 @@ class GUI:
             return
 
         data = self.format_data()
+        
         print(data)
 
         model = load_model('model.h5')
         df = pd.DataFrame([data])
         scaler = MinMaxScaler()
-        df_scaled = scaler.fit_transform(df)
+        df_to_scale = pd.read_csv('final_moves.csv')
+        X_train = df_to_scale.drop(columns=['PlayerMove'])
+        scaler.fit(X_train)
+        df_scaled = scaler.transform(df)
         pred = model.predict(df_scaled)
 
         # sort the moves based on their probabilities in descending order
