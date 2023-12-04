@@ -17,6 +17,8 @@ class GUI:
     _move_info_subframes: list[ttk.Frame]
     _status_info_frame: ttk.Frame
     _status_info_subframes: list[ttk.Frame]
+    _battlefield_info_frame: ttk.Frame
+    _battlefield_info_subframes: list[ttk.Frame]
     my_team: list[StartingPokemonInfo]
     enemy_team: list[PokemonInfo]
     moves: list[MoveInfo]
@@ -33,6 +35,7 @@ class GUI:
         self._far_team_info_frame, self._far_team_info_subframes = self._add_team_info('Enemy Team')
         self._move_info_frame, self._move_info_subframes = self._add_move_info()
         self._status_info_frame, self._status_info_subframes = self._add_status_info()
+        self._battlefield_info_frame, self._battlefield_info_subframes = self.add_battlefield_info()
     
     def run(self) -> None:
         """Run the GUI."""
@@ -95,6 +98,16 @@ class GUI:
         
         self.update_info_frame(self._status_info_frame, self._status_info_subframes, status_strings)
     
+    def _update_battlefield_info_from_driver(self) -> None:
+        """Update the battlefield info frame from the driver."""
+        if self.driver is None:
+            return
+        
+        battlefield_info = self.driver.get_battlefield_info()
+        battlefield_strings = [info.split('\n') for info in battlefield_info.display_items()]
+        
+        self.update_info_frame(self._battlefield_info_frame, self._battlefield_info_subframes, battlefield_strings)
+    
     def _add_buttons(self) -> None:
         """Add buttons to the window."""
         button_frame = ttk.Frame(self.window)
@@ -106,6 +119,8 @@ class GUI:
         btn = ttk.Button(button_frame, text='Get Move Info', command=self._update_move_info_from_driver)
         btn.pack(side=tkinter.LEFT, padx=5, pady=5)
         btn = ttk.Button(button_frame, text='Get Status Info', command=self._update_status_info_from_driver)
+        btn.pack(side=tkinter.LEFT, padx=5, pady=5)
+        btn = ttk.Button(button_frame, text='Get Battlefield Info', command=self._update_battlefield_info_from_driver)
         btn.pack(side=tkinter.LEFT, padx=5, pady=5)
     
     def _add_team_info(self, team_name: str) -> tuple[ttk.Frame, list[ttk.Frame]]:
@@ -171,6 +186,28 @@ class GUI:
             subframes.append(status_frame)
         
         return status_info_frame, subframes
+
+    def add_battlefield_info(self) -> tuple[ttk.Frame, list[ttk.Frame]]:
+        """Adds an area to display battlefield info in a horizontal frame."""
+        battlefield_frame = ttk.Frame(self.window)
+        battlefield_frame.pack(side=tkinter.TOP, pady=10)
+        
+        battlefield_label = ttk.Label(battlefield_frame, text='Battlefield Info')
+        battlefield_label.pack(side=tkinter.TOP)
+        
+        battlefield_info_frame = ttk.Frame(battlefield_frame)
+        battlefield_info_frame.pack(side=tkinter.TOP)
+        
+        subframes: list[ttk.Frame] = []
+        
+        for _ in range(3):
+            battlefield_frame = ttk.Frame(battlefield_info_frame)
+            battlefield_frame.pack(side=tkinter.LEFT, padx=5)
+            name_label = ttk.Label(battlefield_frame, text='Unknown')
+            name_label.pack(side=tkinter.TOP)
+            subframes.append(battlefield_frame)
+        
+        return battlefield_info_frame, subframes
     
     def update_info_frame(self, frame: ttk.Frame, subframes: list[ttk.Frame], info: list[list[str]]) -> None:
         """Update the info frame with the given info."""
