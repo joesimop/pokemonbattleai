@@ -46,6 +46,8 @@ class ModifierInfo:
             final_string += '\nToxic'
         if self.endure:
             final_string += '\nEndure'
+        if self.poison:
+            final_string += '\nPoison'
         return final_string
 
 @dataclass
@@ -118,10 +120,10 @@ class BattlefieldInfo:
         """Return a string representation of the items."""
         final_strings: list[str] = []
         final_strings.append(f'Weather: {self.weather}\nTerrain: {self.terrain}')
-        final_strings.append('My Other:\n' + '\n'.join(f'- {effect}' for effect in self.my_other))
-        final_strings.append('Enemy Other:\n' + '\n'.join(f'- {effect}' for effect in self.enemy_other))
-        final_strings.append('My Hazards:\n' + '\n'.join(f'- {effect}' for effect in self.my_hazards))
-        final_strings.append('Enemy Hazards:\n' + '\n'.join(f'- {effect}' for effect in self.enemy_hazards))
+        final_strings.append('My Other:' + ''.join(f'\n- {effect}' for effect in self.my_other))
+        final_strings.append('Enemy Other:' + ''.join(f'\n- {effect}' for effect in self.enemy_other))
+        final_strings.append('My Hazards:' + ''.join(f'\n- {effect}' for effect in self.my_hazards))
+        final_strings.append('Enemy Hazards:' + ''.join(f'\n- {effect}' for effect in self.enemy_hazards))
         return final_strings
 
 def _convert_stat_to_stage(raw: float, acc_eva: bool) -> int:

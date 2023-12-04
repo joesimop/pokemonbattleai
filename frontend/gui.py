@@ -14,25 +14,30 @@ from .conversion import serialize_data, load_pokemon_table
 class GUI:
     
     window: tkinter.Tk
-    driver: WebDriver | None
-    _near_team_info_frame: ttk.Frame
-    _near_team_info_subframes: list[ttk.Frame]
-    _far_team_info_frame: ttk.Frame
-    _far_team_info_subframes: list[ttk.Frame]
-    _move_info_frame: ttk.Frame
-    _move_info_subframes: list[ttk.Frame]
-    _status_info_frame: ttk.Frame
-    _status_info_subframes: list[ttk.Frame]
-    _battlefield_info_frame: ttk.Frame
-    _battlefield_info_subframes: list[ttk.Frame]
-    _prediction: ttk.Frame
-    _prediction_subframe: list[ttk.Frame]
-    my_team: list[StartingPokemonInfo]
-    enemy_team: list[PokemonInfo]
-    moves: list[MoveInfo]
-    my_status: ModifierInfo
-    enemy_status: ModifierInfo
-    battlefield: BattlefieldInfo
+    driver: WebDriver | None = None
+
+    tree: ttk.Treeview | None = None
+    _treeview_info_frame: ttk.Frame | None = None
+
+    _near_team_info_frame: ttk.Frame | None = None
+    _near_team_info_subframes: list[ttk.Frame] | None = None
+    _far_team_info_frame: ttk.Frame | None = None
+    _far_team_info_subframes: list[ttk.Frame] | None = None
+    _move_info_frame: ttk.Frame | None = None
+    _move_info_subframes: list[ttk.Frame] | None = None
+    _status_info_frame: ttk.Frame | None = None
+    _status_info_subframes: list[ttk.Frame] | None = None
+    _battlefield_info_frame: ttk.Frame | None = None
+    _battlefield_info_subframes: list[ttk.Frame] | None = None
+    _prediction_frame: ttk.Frame | None = None
+    _prediction_subframe: list[ttk.Frame] | None = None
+
+    my_team: list[StartingPokemonInfo] | None = None
+    enemy_team: list[PokemonInfo] | None = None
+    moves: list[MoveInfo] | None = None
+    my_status: ModifierInfo | None = None
+    enemy_status: ModifierInfo | None = None
+    battlefield: BattlefieldInfo | None = None
     
     """A GUI for the bot."""
     def __init__(self, window_name: str, geometry: str) -> None:
@@ -40,14 +45,24 @@ class GUI:
         self.window = tkinter.Tk()
         self.window.title(window_name)
         self.window.geometry(geometry)
+
+        info_frame = ttk.Frame(self.window)
+        info_frame.pack(fill=tkinter.BOTH, expand=True)
+        tree_frame = ttk.Frame(info_frame)
+        tree_frame.pack(side=tkinter.LEFT, fill=tkinter.BOTH)
+        self.tree = self.create_treeview(tree_frame)
+        self._treeview_info_frame = ttk.Frame(info_frame)
+        self._treeview_info_frame.pack(side=tkinter.LEFT, fill=tkinter.BOTH, expand=True)
         
+        # self._near_team_info_frame, self._near_team_info_subframes = self._add_team_info('Your Team')
+        # self._far_team_info_frame, self._far_team_info_subframes = self._add_team_info('Enemy Team')
+        # self._move_info_frame, self._move_info_subframes = self._add_move_info()
+        # self._status_info_frame, self._status_info_subframes = self._add_status_info()
+        # self._battlefield_info_frame, self._battlefield_info_subframes = self.add_battlefield_info()
+        
+        self._prediction_frame, self._prediction_subframe = self.add_prediction()
+
         self._add_buttons()
-        self._near_team_info_frame, self._near_team_info_subframes = self._add_team_info('Your Team')
-        self._far_team_info_frame, self._far_team_info_subframes = self._add_team_info('Enemy Team')
-        self._move_info_frame, self._move_info_subframes = self._add_move_info()
-        self._status_info_frame, self._status_info_subframes = self._add_status_info()
-        self._battlefield_info_frame, self._battlefield_info_subframes = self.add_battlefield_info()
-        self._prediction, self._prediction_subframe = self.add_prediction()
     
     def run(self) -> None:
         """Run the GUI."""
@@ -57,6 +72,95 @@ class GUI:
         """Hook the GUI to the driver."""
         self.driver = driver
     
+    def create_treeview(self, frame: tkinter.Frame) -> ttk.Treeview:
+        """Create a treeview for the given frame."""
+        tree = ttk.Treeview(frame)
+        tree.pack(side=tkinter.LEFT, fill=tkinter.Y)
+        tree_scroll = ttk.Scrollbar(frame, orient='vertical', command=tree.yview)
+        tree_scroll.pack(side=tkinter.LEFT, fill=tkinter.Y)
+        tree.configure(yscrollcommand=tree_scroll.set)
+
+        # add entries for the teams, moves, statuses, and battlefield
+        tree.insert('', 'end', 'team', text='Team')
+        tree.insert('team', 'end', 'near_team', text='Near Team')
+        tree.insert('team', 'end', 'far_team', text='Far Team')
+        tree.insert('', 'end', 'moves', text='Moves')
+        tree.insert('', 'end', 'statuses', text='Statuses')
+        tree.insert('', 'end', 'battlefield', text='Battlefield')
+
+        # call update_selection_frame when the selection changes
+        tree.bind('<<TreeviewSelect>>', lambda _: self.update_selection_frame())
+
+        return tree
+
+    def update_tree_teams(self) -> None:
+        """Add the teams to the treeview."""
+        for child in self.tree.get_children('near_team'):
+            self.tree.delete(child)
+        for child in self.tree.get_children('far_team'):
+            self.tree.delete(child)
+        if self.my_team is not None:
+            for i, pokemon in enumerate(self.my_team):
+                name = f'{pokemon.nickname} ({pokemon.name})' if pokemon.nickname is not None else pokemon.name
+                self.tree.insert('near_team', 'end', f'near_pokemon_{i}', text=name)
+        if self.enemy_team is not None:
+            for i, pokemon in enumerate(self.enemy_team):
+                name = f'{pokemon.nickname} ({pokemon.name})' if pokemon.nickname is not None else pokemon.name
+                self.tree.insert('far_team', 'end', f'far_pokemon_{i}', text=name)
+    
+    def update_selection_frame(self) -> None:
+        """Update the treeview info frame based on the current treeview selection."""
+        selection = self.tree.selection()
+        if len(selection) == 0:
+            return
+        selection = selection[0]
+
+        def write_to_frame(lines: list[str]) -> None:
+            """Write the given lines to the info frame."""
+            for child in self._treeview_info_frame.winfo_children():
+                child.destroy()
+            for line in lines:
+                label = ttk.Label(self._treeview_info_frame, text=line)
+                label.pack(side=tkinter.TOP, anchor=tkinter.W, pady=3)
+
+        if selection == 'near_team':
+            if self.my_team is None:
+                write_to_frame(['No team info available.'])
+            else:
+                write_to_frame([f'{pokemon.name}: {pokemon.hp_percent:02}%' for pokemon in self.my_team])
+        elif selection == 'far_team':
+            if self.enemy_team is None:
+                write_to_frame(['No team info available.'])
+            else:
+                write_to_frame([f'{pokemon.name}: {pokemon.hp_percent:02}%' for pokemon in self.enemy_team])
+        elif selection == 'moves':
+            if self.moves is None:
+                write_to_frame(['No move info available.'])
+            else:
+                write_to_frame([f'{move.name}: {move.type} ({move.moves_left})' for move in self.moves])
+        elif selection == 'statuses':
+            if self.my_status is None or self.enemy_status is None:
+                write_to_frame(['No status info available.'])
+            else:
+                write_to_frame([self.my_status.display(), self.enemy_status.display()])
+        elif selection == 'battlefield':
+            if self.battlefield is None:
+                write_to_frame(['No battlefield info available.'])
+            else:
+                write_to_frame(self.battlefield.display_items())
+        elif selection.startswith('near_pokemon_'):
+            if self.my_team is None:
+                write_to_frame(['No team info available.'])
+            else:
+                index = int(selection.split('_')[-1])
+                write_to_frame([self.my_team[index].display()])
+        elif selection.startswith('far_pokemon_'):
+            if self.enemy_team is None:
+                write_to_frame(['No team info available.'])
+            else:
+                index = int(selection.split('_')[-1])
+                write_to_frame([self.enemy_team[index].display()])
+    
     def _update_starting_team_info_from_driver(self) -> None:
         """Update the starting team info frame from the driver."""
         if self.driver is None:
@@ -64,11 +168,16 @@ class GUI:
         # slight delay to wait for mouse movement to stop
         time.sleep(0.5)
         
-        starting_team_info = self.driver.get_starting_info()
-        starting_team_info_strings = [info.display().split('\n') for info in starting_team_info]
-        self.update_info_frame(self._near_team_info_frame, self._near_team_info_subframes, starting_team_info_strings)
+        self.my_team = self.driver.get_starting_info()
+
+        if self._near_team_info_frame is not None and self._near_team_info_subframes is not None:
+            starting_team_info_strings = [info.display().split('\n') for info in self.my_team]
+            self.update_info_frame(self._near_team_info_frame, self._near_team_info_subframes, starting_team_info_strings)
         
-        self.my_team = starting_team_info
+        if self.tree is not None:
+            self.update_tree_teams()
+            self.tree.selection_set('near_team')
+            self.update_selection_frame()
     
     def _update_enemy_team_info_from_driver(self) -> None:
         """Update the enemy team info frame from the driver."""
@@ -77,11 +186,16 @@ class GUI:
         # slight delay to wait for mouse movement to stop
         time.sleep(0.5)
         
-        far_team_info = self.driver.get_enemy_team_info()
-        far_team_info_strings = [info.display().split('\n') for info in far_team_info]
-        self.update_info_frame(self._far_team_info_frame, self._far_team_info_subframes, far_team_info_strings)
+        self.enemy_team = self.driver.get_enemy_team_info()
+
+        if self._far_team_info_frame is not None and self._far_team_info_subframes is not None:
+            far_team_info_strings = [info.display().split('\n') for info in self.enemy_team]
+            self.update_info_frame(self._far_team_info_frame, self._far_team_info_subframes, far_team_info_strings)
         
-        self.enemy_team = far_team_info
+        if self.tree is not None:
+            self.update_tree_teams()
+            self.tree.selection_set('far_team')
+            self.update_selection_frame()
     
     def _update_move_info_from_driver(self) -> None:
         """Update the info frame from the driver."""
@@ -89,41 +203,48 @@ class GUI:
             return
         # slight delay to wait for mouse movement to stop
         time.sleep(0.5)
-        move_info = self.driver.get_available_moves()
-        move_info_strings = [info.display().split('\n') for info in move_info]
-        self.update_info_frame(self._move_info_frame, self._move_info_subframes, move_info_strings)
+        self.moves = self.driver.get_available_moves()
+
+        if self._move_info_frame is not None and self._move_info_subframes is not None:
+            move_info_strings = [info.display().split('\n') for info in self.moves]
+            self.update_info_frame(self._move_info_frame, self._move_info_subframes, move_info_strings)
         
-        self.moves = move_info
+        if self.tree is not None:
+            self.tree.selection_set('moves')
+            self.update_selection_frame()
     
     def _update_status_info_from_driver(self) -> None:
         """Update the status info frame from the driver."""
         if self.driver is None:
             return
         
-        status_strings: list[list[str]] = []
+        self.my_status = self.driver.get_my_statbar()
+        self.enemy_status = self.driver.get_enemy_statbar()
         
-        my_status_info = self.driver.get_my_statbar()
-        status_strings.append(my_status_info.display().split('\n'))
+        if self._status_info_frame is not None and self._status_info_subframes is not None:
+            status_strings: list[list[str]] = []
+            status_strings.append(self.my_status.display().split('\n'))
+            status_strings.append(self.enemy_status.display().split('\n'))
+            self.update_info_frame(self._status_info_frame, self._status_info_subframes, status_strings)
         
-        enemy_status_info = self.driver.get_enemy_statbar()
-        status_strings.append(enemy_status_info.display().split('\n'))
-        
-        self.update_info_frame(self._status_info_frame, self._status_info_subframes, status_strings)
-
-        self.my_status = my_status_info
-        self.enemy_status = enemy_status_info
+        if self.tree is not None:
+            self.tree.selection_set('statuses')
+            self.update_selection_frame()
     
     def _update_battlefield_info_from_driver(self) -> None:
         """Update the battlefield info frame from the driver."""
         if self.driver is None:
             return
         
-        battlefield_info = self.driver.get_battlefield_info()
-        battlefield_strings = [info.split('\n') for info in battlefield_info.display_items()]
-        
-        self.update_info_frame(self._battlefield_info_frame, self._battlefield_info_subframes, battlefield_strings)
+        self.battlefield = self.driver.get_battlefield_info()
 
-        self.battlefield = battlefield_info
+        if self._battlefield_info_frame is not None and self._battlefield_info_subframes is not None:
+            battlefield_strings = [info.split('\n') for info in self.battlefield.display_items()]
+            self.update_info_frame(self._battlefield_info_frame, self._battlefield_info_subframes, battlefield_strings)
+        
+        if self.tree is not None:
+            self.tree.selection_set('battlefield')
+            self.update_selection_frame()
     
     def _update_all_info_from_driver(self) -> None:
         """Update all info frames from the driver."""
@@ -136,24 +257,27 @@ class GUI:
     def _add_buttons(self) -> None:
         """Add buttons to the window."""
         button_frame = ttk.Frame(self.window)
-        button_frame.pack(side=tkinter.BOTTOM, pady=10)
-        btn = ttk.Button(button_frame, text='Get Starting Info', command=self._update_starting_team_info_from_driver)
-        btn.pack(side=tkinter.LEFT, padx=5, pady=5)
-        btn = ttk.Button(button_frame, text='Get Enemy Team Info', command=self._update_enemy_team_info_from_driver)
-        btn.pack(side=tkinter.LEFT, padx=5, pady=5)
-        btn = ttk.Button(button_frame, text='Get Move Info', command=self._update_move_info_from_driver)
-        btn.pack(side=tkinter.LEFT, padx=5, pady=5)
+        button_frame.pack(side=tkinter.BOTTOM, pady=5)
         btn = ttk.Button(button_frame, text='Get Status Info', command=self._update_status_info_from_driver)
-        btn.pack(side=tkinter.LEFT, padx=5, pady=5)
+        btn.pack(side=tkinter.LEFT, padx=5)
         btn = ttk.Button(button_frame, text='Get Battlefield Info', command=self._update_battlefield_info_from_driver)
-        btn.pack(side=tkinter.LEFT, padx=5, pady=5)
+        btn.pack(side=tkinter.LEFT, padx=5)
 
         button_frame = ttk.Frame(self.window)
-        button_frame.pack(side=tkinter.BOTTOM, pady=10)
+        button_frame.pack(side=tkinter.BOTTOM, pady=5)
+        btn = ttk.Button(button_frame, text='Get Starting Info', command=self._update_starting_team_info_from_driver)
+        btn.pack(side=tkinter.LEFT, padx=5)
+        btn = ttk.Button(button_frame, text='Get Enemy Team Info', command=self._update_enemy_team_info_from_driver)
+        btn.pack(side=tkinter.LEFT, padx=5)
+        btn = ttk.Button(button_frame, text='Get Move Info', command=self._update_move_info_from_driver)
+        btn.pack(side=tkinter.LEFT, padx=5)
+
+        button_frame = ttk.Frame(self.window)
+        button_frame.pack(side=tkinter.BOTTOM, pady=5)
         btn = ttk.Button(button_frame, text='Get All Info', command=self._update_all_info_from_driver)
-        btn.pack(side=tkinter.LEFT, padx=5, pady=5)
+        btn.pack(side=tkinter.LEFT, padx=5)
         btn = ttk.Button(button_frame, text='Run Model', command=self._update_prediction)
-        btn.pack(side=tkinter.LEFT, padx=5, pady=5)
+        btn.pack(side=tkinter.LEFT, padx=5)
     
     def _add_team_info(self, team_name: str) -> tuple[ttk.Frame, list[ttk.Frame]]:
         """Adds an area to display team info in a horizontal frame."""
@@ -246,7 +370,7 @@ class GUI:
         prediction_frame = ttk.Frame(self.window)
         prediction_frame.pack(side=tkinter.TOP, pady=10)
         
-        prediction_label = ttk.Label(prediction_frame, text='Prediction')
+        prediction_label = ttk.Label(prediction_frame, text='Predictions')
         prediction_label.pack(side=tkinter.TOP)
         
         prediction_info_frame = ttk.Frame(prediction_frame)
@@ -283,10 +407,8 @@ class GUI:
         my_onfield: StartingPokemonInfo | None = None
         my_bench = self.my_team.copy()
         active_pokemon_name = self.my_status.pokemon
-        print(active_pokemon_name)
         for pokemon in my_bench:
             nickname = pokemon.nickname if pokemon.nickname is not None else pokemon.name
-            print(f'\t{nickname}')
             if nickname == active_pokemon_name:
                 my_onfield = pokemon
                 my_bench.remove(pokemon)
@@ -323,8 +445,6 @@ class GUI:
             return
 
         data = self.format_data()
-        
-        print(data)
 
         model = load_model('model.h5')
         df = pd.DataFrame([data])
@@ -347,16 +467,18 @@ class GUI:
         # Create a dictionary mapping from move name to a numerical value or index
         # Assuming the Excel file has columns 'move_name' and 'move_value'
         move_mapping = pd.Series(df_moves['id'].values, index=df_moves['name']).to_dict()
+        move_mapping['switch'] = 0
+        reverse_move_mapping = {v: k for k, v in move_mapping.items()}
 
         # Assuming self.moves is a list of move names
         # Encode self.moves using the mapping
         encoded_moves = [move_mapping[move.name] for move in self.moves if move.name in move_mapping]
 
-        # Find the highest probability move that is in the user's list of available moves
-        highest_valid_move_index = next((index for index in sorted_indices if index in encoded_moves), None)
+        # Filter the list to a list of valid moves
+        valid_moves = [index for index in sorted_indices if index in encoded_moves or index == 0]
 
-        reverse_move_mapping = {v: k for k, v in move_mapping.items()}
-        print([reverse_move_mapping[i] for i in sorted_indices[:5]])
-        move_name = reverse_move_mapping[highest_valid_move_index]
+        # Format into a list of strings with the move name and probability
+        move_probabilities = [f'{reverse_move_mapping[index]}: {(pred[0][index]*100):.2f}%' for index in valid_moves]
 
-        self.update_info_frame(self._prediction, self._prediction_subframe, [[move_name]])
+        if self._prediction_frame is not None and self._prediction_subframe is not None:
+            self.update_info_frame(self._prediction_frame, self._prediction_subframe, [move_probabilities])
